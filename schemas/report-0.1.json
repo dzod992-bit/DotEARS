@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dotears:report:0.1",
+  "title": "DotEARS report 0.1",
+  "type": "object",
+  "required": ["schema_version", "engine_version", "analysis_id", "created_at", "profile", "source", "audio", "events", "visual_events", "sync_candidates", "warnings", "metrics", "report_path", "classification", "transcription", "provenance", "reference"],
+  "properties": {
+    "schema_version": {"const": "0.1"},
+    "engine_version": {"type": "string"},
+    "analysis_id": {"type": "string", "pattern": "^[a-f0-9]{24}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "profile": {"enum": ["motion", "general"]},
+    "cache_hit": {"type": "boolean"},
+    "report_path": {"type": "string"},
+    "source": {
+      "type": "object",
+      "required": ["type", "sha256", "duration_seconds", "size_bytes", "timeline_origin"],
+      "properties": {
+        "type": {"enum": ["local", "url"]},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "duration_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "timeline_origin": {"const": "container_start"}
+      }
+    },
+    "audio": {
+      "type": "object", "required": ["present", "has_music", "has_speech", "timeline_offset_seconds"],
+      "properties": {
+        "present": {"type": "boolean"},
+        "has_music": {"type": ["boolean", "null"]},
+        "has_speech": {"type": ["boolean", "null"]},
+        "timeline_offset_seconds": {"type": "number", "minimum": 0},
+        "analysis_path": {"type": ["string", "null"]},
+        "native_path": {"type": ["string", "null"]},
+        "original_path": {"type": ["string", "null"]}
+      }
+    },
+    "events": {
+      "type": "array", "items": {
+        "type": "object",
+        "required": ["id", "start", "end", "category", "label", "confidence", "score", "score_kind", "method", "clip_path", "mixture_status", "overlap"],
+        "properties": {
+          "id": {"type": "string"},
+          "start": {"type": "number", "minimum": 0},
+          "end": {"type": "number", "exclusiveMinimum": 0},
+          "peak_time": {"type": "number", "minimum": 0},
+          "category": {"enum": ["audio_attack", "speech", "music", "sound_event"]},
+          "label": {"type": "string"},
+          "confidence": {"type": "null"},
+          "score": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+          "score_kind": {"type": "string"},
+          "method": {"type": "string"},
+          "clip_path": {"type": ["string", "null"]},
+          "mixture_status": {"const": "mixed_track_not_source_separated"},
+          "overlap": {"oneOf": [{"const": "unknown"}, {"type": "array", "items": {"type": "string"}}]}
+        }
+      }
+    },
+    "attack_detection": {
+      "type": "object",
+      "required": ["status", "candidates_total", "selected_by_limit", "omitted_by_limit", "removed_by_timeline", "returned", "limit", "selection_method"],
+      "properties": {
+        "status": {"enum": ["completed", "not_requested", "no_audio"]},
+        "candidates_total": {"type": ["integer", "null"], "minimum": 0},
+        "selected_by_limit": {"type": ["integer", "null"], "minimum": 0},
+        "omitted_by_limit": {"type": ["integer", "null"], "minimum": 0},
+        "removed_by_timeline": {"type": ["integer", "null"], "minimum": 0},
+        "returned": {"type": ["integer", "null"], "minimum": 0},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+        "selection_method": {"const": "strongest_relative_onset_strength_then_time"}
+      }
+    },
+    "visual_events": {"type": "array", "items": {"type": "object", "required": ["id", "time", "type", "method"]}},
+    "sync_candidates": {"type": "array", "items": {"type": "object", "required": ["event_id", "visual_event_id", "delta_seconds", "interpretation"]}},
+    "classification": {"type": "object", "required": ["status"]},
+    "transcription": {"type": "object", "required": ["status", "segments"]},
+    "provenance": {"type": "object"},
+    "reference": {"type": "object", "required": ["reuse_rights"]},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "metrics": {"type": "object"}
+  }
+}

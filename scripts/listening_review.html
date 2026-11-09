@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; media-src data:; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>DotEARS · Проверка на слух</title>
+  <style>
+    :root { color-scheme: light dark; --bg: light-dark(#f4f3ef,#171917); --panel: light-dark(#fff,#222622); --fg: light-dark(#222b25,#edf1ea); --muted: light-dark(#56635a,#b0bdb1); --line: light-dark(#d5ddd3,#414b41); --accent: light-dark(#285b39,#b5e3ad); --on-accent: light-dark(#fff,#182d18); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui,sans-serif; }
+    main { max-width: 1160px; margin: auto; padding: 28px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+    h1 { font-size: 26px; font-weight: 600; margin: 4px 0; }
+    h2 { font-size: 20px; margin: 0 0 14px; }
+    p { margin: 8px 0; }
+    small,.muted { color: var(--muted); }
+    .eyebrow { letter-spacing: .12em; font-size: 12px; font-weight: 600; }
+    .actions,.row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    button,select,input,textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+    button { cursor: pointer; }
+    button:disabled { opacity: .5; cursor: default; }
+    button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+    button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    label { display: grid; gap: 6px; }
+    select,textarea,input[type=text] { width: 100%; min-width: 0; }
+    textarea { min-height: 75px; resize: vertical; }
+    .intro { max-width: 900px; margin: 20px 0; }
+    .workspace { display: grid; grid-template-columns: minmax(0,1.12fr) minmax(0,1fr); gap: 22px; align-items: start; }
+    .panel { min-width: 0; background: var(--panel); border-radius: 14px; padding: 20px; }
+    .panel + .panel { margin-top: 16px; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+    .fields .wide { grid-column: 1 / -1; }
+    video { display: block; width: 100%; margin: 14px 0; border-radius: 9px; background: #111; aspect-ratio: 16/9; }
+    audio { display: block; width: 100%; margin: 16px 0; }
+    .progress { height: 6px; border-radius: 4px; background: var(--line); margin: 10px 0; overflow: hidden; }
+    .progress div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+    .time { font-variant-numeric: tabular-nums; }
+    .check { display: flex; align-items: start; gap: 10px; margin-top: 16px; }
+    .check input { margin-top: 6px; }
+    .marker { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; display: grid; gap: 8px; }
+    details { margin-top: 14px; }
+    summary { cursor: pointer; }
+    #message { min-height: 24px; margin: 14px 0; }
+    #storage { display: block; margin-top: 12px; }
+    @media(max-width: 850px) { .workspace { grid-template-columns: 1fr; } }
+    @media(max-width: 460px) { main { padding: 16px; } .panel { padding: 14px; } .fields { grid-template-columns: 1fr; } header .actions { width: 100%; } header button { flex: 1; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">DOTEARS / ПРОВЕРКА КАЧЕСТВА</div><h1>Что действительно слышно?</h1></div>
+    <div class="actions"><button id="export" class="primary">Сохранить отметки</button><button id="import">Загрузить отметки</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+  </header>
+  <p class="intro">Послушай ролик целиком, затем проверь выбранные моменты. Для каждого укажи, что слышно и полезен ли этот акцент при разборе монтажа. Если короткого фрагмента мало, включи контекст. Первые 12 моментов — выборка для начала; все найденные атаки тоже доступны.</p>
+  <p id="message" role="status" aria-live="polite"></p>
+  <div class="workspace">
+    <div>
+      <section class="panel">
+        <label for="reference">Ролик<select id="reference"></select></label>
+        <video id="video" controls preload="metadata" playsinline></video>
+        <div class="row"><button id="whole">С начала ролика</button><button id="mark">Отметить звук здесь</button><span id="video-time" class="time muted">0,000 с</span></div>
+        <p class="muted">Заметил звук, которому нет подходящей атаки? Останови видео и нажми «Отметить звук здесь».</p>
+        <label class="check"><input id="full-review" type="checkbox"><span>Прослушал весь ролик и отметил пропущенные значимые звуки.</span></label>
+      </section>
+      <section class="panel"><h2>Мои дополнительные моменты</h2><div id="markers"></div></section>
+    </div>
+    <section class="panel">
+      <div class="fields" style="margin-top:0">
+        <label for="scope">Набор<select id="scope"><option value="starter">Выборка для проверки</option><option value="all">Все найденные атаки</option></select></label>
+        <label for="event">Момент<select id="event"></select></label>
+      </div>
+      <div class="row"><h2 id="event-heading" style="margin:0"></h2><span id="event-time" class="time muted"></span></div>
+      <audio id="audio" controls preload="metadata"></audio>
+      <div class="row"><button id="listen" class="primary">Слушать фрагмент</button><button id="context">Смотреть с контекстом</button></div>
+      <p class="muted">Исходная смешанная дорожка. В одном фрагменте могут звучать музыка, речь и эффект.</p>
+      <div class="fields">
+        <label for="kind">Что слышно?<select id="kind"><option value="">Выбери после прослушивания</option><option value="effect">Звуковой эффект</option><option value="music">Музыкальный акцент</option><option value="speech">Речь</option><option value="mixed">Смешано, трудно разделить</option><option value="nothing">Ничего заметного</option><option value="uncertain">Не уверен</option></select></label>
+        <label for="useful">Полезно для разбора монтажа?<select id="useful"><option value="">Пока не оценено</option><option value="yes">Да</option><option value="no">Нет</option><option value="uncertain">Не уверен</option></select></label>
+        <label class="wide" for="sound-name">Название звука, если понятно<input id="sound-name" type="text" placeholder="Можно оставить пустым" maxlength="200"></label>
+        <label class="wide" for="note">Комментарий<textarea id="note" placeholder="Например: удар в музыке совпадает со сменой сцены" maxlength="2000"></textarea></label>
+      </div>
+      <div class="row"><button id="prev">← Назад</button><button id="next" class="primary">Дальше →</button></div>
+      <p id="progress-text" class="muted" aria-live="polite"></p><div class="progress"><div id="progress-bar"></div></div>
+      <small id="storage"></small>
+      <details><summary>Как будем использовать отметки</summary><p>Сравним полезные акценты, ложные кандидаты и пропуски. Названия эффектов проверим отдельно. Выборка из 12 моментов не позволяет оценить полноту детектора; для этого нужен полный проход ролика и найденных атак.</p><p>Страница работает без сети. Отметки сохраняются в этом браузере, если он разрешает локальное хранилище. Кнопка сверху выгружает JSON с привязкой к хэшам исходников. В выгрузке нет видео и аудио.</p></details>
+    </section>
+  </div>
+</main>
+<script id="review-data" type="application/json">__REVIEW_DATA__</script>
+<script>
+(() => {
+  'use strict';
+  const data = JSON.parse(document.getElementById('review-data').textContent);
+  const $ = id => document.getElementById(id);
+  const refs = data.references;
+  const key = 'dotears-listening-review-v1:' + refs.map(r => r.analysis_id).join(':');
+  const schema = 'dotears.listening-review/1';
+  const kinds = new Set(['','effect','music','speech','mixed','nothing','uncertain']);
+  const usefulValues = new Set(['','yes','no','uncertain']);
+  let annotations = Object.fromEntries(refs.map(r => [r.analysis_id, {events:{}, markers:[], full_review_completed:false}]));
+  let selectedRef = 0;
+  let selectedId = '';
+  let segmentEnd = null;
+  let autosaved = true;
+  const time = n => n.toLocaleString('ru-RU',{minimumFractionDigits:3,maximumFractionDigits:3}) + ' с';
+  const ref = () => refs[selectedRef];
+  const review = () => annotations[ref().analysis_id];
+  const event = () => ref().attacks.find(e => e.id === selectedId);
+  const events = () => $('scope').value === 'all' ? ref().attacks : ref().attacks.filter(e => ref().starter_ids.includes(e.id));
+  const message = text => { $('message').textContent = text; };
+  function snapshot() {
+    return {schema_version:schema, saved_at:new Date().toISOString(),
+      references:refs.map(r => ({analysis_id:r.analysis_id, source_sha256:r.source_sha256,
+        engine_version:r.engine_version, title:r.title, report_path:r.report_path,
+        reported_attacks:r.attacks.map(e => ({id:e.id, peak_time:e.peak_time})),
+        ...annotations[r.analysis_id]}))};
+  }
+  function validateImport(value) {
+    if (!value || value.schema_version !== schema || !Array.isArray(value.references) || value.references.length !== refs.length) throw new Error('Неподходящий формат отметок.');
+    const result = {};
+    for (const r of refs) {
+      const rows = value.references.filter(x => x.analysis_id === r.analysis_id && x.source_sha256 === r.source_sha256);
+      if (rows.length !== 1) throw new Error('Отметки относятся к другим исходникам или отчётам.');
+      const row = rows[0];
+      if (!row.events || typeof row.events !== 'object' || Array.isArray(row.events) || !Array.isArray(row.markers) || typeof row.full_review_completed !== 'boolean') throw new Error('Повреждена структура отметок.');
+      const cleanEvents = {};
+      for (const [id, e] of Object.entries(row.events)) {
+        if (!r.attacks.some(a => a.id === id) || !e || !kinds.has(e.kind) || !usefulValues.has(e.useful) || typeof e.sound_name !== 'string' || typeof e.note !== 'string' || e.sound_name.length > 200 || e.note.length > 2000) throw new Error('Некорректная оценка момента.');
+        cleanEvents[id] = {kind:e.kind, useful:e.useful, sound_name:e.sound_name, note:e.note};
+      }
+      const markers = row.markers.map(m => {
+        if (!m || !Number.isFinite(m.time) || m.time < 0 || m.time > r.duration || typeof m.note !== 'string' || m.note.length > 2000) throw new Error('Некорректный дополнительный момент.');
+        return {time:m.time, note:m.note};
+      });
+      result[r.analysis_id] = {events:cleanEvents, markers, full_review_completed:row.full_review_completed};
+    }
+    return result;
+  }
+  try { const saved = localStorage.getItem(key); if (saved) annotations = validateImport(JSON.parse(saved)); }
+  catch (_) { autosaved = false; }
+  function save() {
+    try { localStorage.setItem(key, JSON.stringify(snapshot())); autosaved = true; }
+    catch (_) { autosaved = false; }
+    progress();
+  }
+  function progress() {
+    const list = events();
+    const count = list.filter(e => { const a = review().events[e.id]; return a && a.kind && a.useful; }).length;
+    const total = Object.values(annotations).reduce((n,r) => n + Object.values(r.events).filter(e => e.kind && e.useful).length,0);
+    $('progress-text').textContent = `В наборе оценено ${count} из ${list.length}. Всего в двух роликах: ${total} из ${refs.reduce((n,r)=>n+r.attacks.length,0)}.`;
+    $('progress-bar').style.width = (list.length ? count/list.length*100 : 0) + '%';
+    $('storage').textContent = autosaved ? 'Отметки сохранены в этом браузере. Для передачи нажми «Сохранить отметки».' : 'Автосохранение недоступно. Нажми «Сохранить отметки», прежде чем закрыть страницу.';
+  }
+  function stop() { $('audio').pause(); $('video').pause(); segmentEnd = null; }
+  function fillEvents(preferred) {
+    stop();
+    const list = events();
+    $('event').replaceChildren(...list.map((e,i) => new Option(`${i+1}. ${time(e.peak_time)} · ${e.id}`,e.id)));
+    selectedId = list.some(e => e.id === preferred) ? preferred : list[0].id;
+    $('event').value = selectedId;
+    renderEvent();
+  }
+  function renderEvent() {
+    stop();
+    const e = event();
+    $('audio').src = e.audio;
+    $('event-heading').textContent = e.id;
+    $('event-time').textContent = time(e.peak_time);
+    const a = review().events[e.id] || {kind:'',useful:'',sound_name:'',note:''};
+    $('kind').value = a.kind; $('useful').value = a.useful;
+    $('sound-name').value = a.sound_name; $('note').value = a.note;
+    const index = events().findIndex(x=>x.id === selectedId);
+    $('prev').disabled = index === 0; $('next').disabled = index === events().length-1;
+    progress();
+  }
+  function renderRef() {
+    stop(); $('video').src = ref().video; $('video-time').textContent = time(0);
+    $('scope').options[0].textContent = `Выборка: ${ref().starter_ids.length} моментов`;
+    $('full-review').checked = review().full_review_completed;
+    fillEvents(); renderMarkers();
+  }
+  function changeAnnotation() {
+    review().events[selectedId] = {kind:$('kind').value, useful:$('useful').value,
+      sound_name:$('sound-name').value, note:$('note').value};
+    save();
+  }
+  function play(media) { media.play().catch(() => message('Нажми ▶ в плеере, чтобы включить воспроизведение.')); }
+  function renderMarkers() {
+    $('markers').replaceChildren();
+    if (!review().markers.length) { const p = document.createElement('p'); p.className='muted'; p.textContent='Пока нет дополнительных отметок.'; $('markers').append(p); }
+    review().markers.forEach((m,i) => {
+      const box = document.createElement('div'); box.className='marker';
+      const row = document.createElement('div'); row.className='row';
+      const seek = document.createElement('button'); seek.textContent='Смотреть с ' + time(m.time);
+      seek.onclick = () => { stop(); $('video').currentTime=Math.max(0,m.time-1); play($('video')); };
+      const remove = document.createElement('button'); remove.textContent='Удалить';
+      remove.onclick = () => { review().markers.splice(i,1); save(); renderMarkers(); };
+      row.append(seek,remove);
+      const label = document.createElement('label'); label.textContent='Что здесь слышно?';
+      const note = document.createElement('textarea'); note.value=m.note; note.maxLength=2000;
+      note.addEventListener('input',() => { m.note=note.value; save(); }); label.append(note);
+      box.append(row,label); $('markers').append(box);
+    });
+  }
+  $('reference').replaceChildren(...refs.map((r,i)=>new Option(r.title,String(i))));
+  $('reference').onchange = () => { selectedRef=Number($('reference').value); renderRef(); };
+  $('scope').onchange = () => fillEvents(selectedId);
+  $('event').onchange = () => { selectedId=$('event').value; renderEvent(); };
+  for (const id of ['kind','useful','sound-name','note']) $(id).addEventListener('input',changeAnnotation);
+  for (const [id,delta] of [['prev',-1],['next',1]]) $(id).onclick = () => {
+    const list=events(); const index=list.findIndex(e=>e.id===selectedId)+delta;
+    if (index>=0 && index<list.length) { selectedId=list[index].id; $('event').value=selectedId; renderEvent(); }
+  };
+  $('listen').onclick = () => { stop(); $('audio').currentTime=0; play($('audio')); };
+  $('audio').addEventListener('play',()=>{ $('video').pause(); segmentEnd=null; });
+  $('video').addEventListener('play',()=>$('audio').pause());
+  $('context').onclick = () => { stop(); $('video').currentTime=Math.max(0,event().peak_time-1.5); segmentEnd=Math.min(ref().duration,event().peak_time+1.5); play($('video')); };
+  $('video').addEventListener('timeupdate',()=>{
+    $('video-time').textContent=time($('video').currentTime);
+    if (segmentEnd!==null && $('video').currentTime>=segmentEnd) { $('video').pause(); segmentEnd=null; }
+  });
+  $('whole').onclick = () => { stop(); $('video').currentTime=0; play($('video')); };
+  $('full-review').onchange = () => { review().full_review_completed=$('full-review').checked; save(); };
+  $('mark').onclick = () => {
+    const at=Math.min(ref().duration,Math.max(0,$('video').currentTime)); stop();
+    review().markers.push({time:Number(at.toFixed(3)),note:''}); save(); renderMarkers();
+    message('Добавлена отметка на ' + time(at) + '. Опиши звук под видео.');
+  };
+  $('export').onclick = () => {
+    const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob); const link=document.createElement('a');
+    link.href=url; link.download='dotears-listening-annotations.json'; document.body.append(link); link.click(); link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000); message('Выгружены текущие отметки. Неоценённые моменты остаются пустыми.');
+  };
+  $('import').onclick = () => $('import-file').click();
+  $('import-file').onchange = async () => {
+    const file=$('import-file').files[0]; if (!file) return;
+    try {
+      if (file.size>2000000) throw new Error('Файл отметок слишком большой.');
+      const incoming=validateImport(JSON.parse(await file.text()));
+      annotations=incoming; save(); renderRef(); message('Отметки загружены.');
+    } catch (e) { message('Не удалось загрузить отметки: ' + e.message); }
+    $('import-file').value='';
+  };
+  renderRef();
+})();
+</script>
+</body>
+</html>

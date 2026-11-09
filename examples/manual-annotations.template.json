@@ -1,0 +1,10 @@
+{
+  "source_sha256": null,
+  "reviewer": null,
+  "speech_intervals": [],
+  "sound_events": [],
+  "music_intervals": [],
+  "musical_accents": [],
+  "visual_events": [],
+  "notes": "Populate after actually listening and viewing. Interval fields use start/end seconds; do not treat this empty template as ground truth."
+}

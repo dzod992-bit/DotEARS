@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; media-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>DotEARS · Разметка звуковых эффектов</title>
+  <style>
+    :root { color-scheme: light dark; --bg: light-dark(#f4f3ef,#171917); --panel: light-dark(#fff,#222622); --fg: light-dark(#222b25,#edf1ea); --muted: light-dark(#56635a,#b0bdb1); --line: light-dark(#d5ddd3,#414b41); --accent: light-dark(#285b39,#b5e3ad); --on-accent: light-dark(#fff,#182d18); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui,sans-serif; }
+    main { max-width: 1080px; margin: auto; padding: 28px; }
+    h1 { font-size: 27px; font-weight: 600; margin: 4px 0; }
+    h2 { font-size: 21px; font-weight: 600; margin: 0; }
+    p { margin: 8px 0; }
+    header,.row,.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    header { justify-content: space-between; }
+    .eyebrow { font-size: 12px; letter-spacing: .12em; font-weight: 600; }
+    .intro { max-width: 900px; margin: 20px 0; }
+    .muted,small { color: var(--muted); }
+    button,select,input,textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+    button { cursor: pointer; }
+    button:disabled { opacity: .45; cursor: default; }
+    button.primary,button[aria-pressed="true"],.number[aria-current="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+    button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .workspace { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(0,1fr); gap: 22px; align-items: start; }
+    .panel { min-width: 0; background: var(--panel); border-radius: 14px; padding: 22px; }
+    .panel + .panel { margin-top: 18px; }
+    audio { display: block; width: 100%; margin: 18px 0 12px; }
+    .choices { display: grid; gap: 8px; margin: 20px 0; }
+    .choice { text-align: left; display: flex; gap: 12px; align-items: center; }
+    .choice span { display: block; }
+    .choice strong { display: block; font-weight: 600; }
+    .choice .hint { font-size: 14px; opacity: .85; }
+    .key { font-variant-numeric: tabular-nums; opacity: .75; min-width: 16px; }
+    label { display: grid; gap: 6px; margin: 14px 0; }
+    select,input[type=text],textarea { width: 100%; min-width: 0; }
+    textarea { min-height: 80px; resize: vertical; }
+    .check { display: flex; align-items: center; gap: 10px; }
+    .check input { margin: 0; }
+    .navigation { justify-content: space-between; margin-top: 20px; }
+    .numbers { display: grid; grid-template-columns: repeat(auto-fit,minmax(43px,1fr)); gap: 7px; margin: 18px 0; }
+    .number { padding: 9px 3px; min-height: 44px; font-variant-numeric: tabular-nums; }
+    .number.reviewed::after { content: ' ✓'; font-size: 12px; }
+    .progress { height: 6px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 12px 0; }
+    .progress div { height: 100%; width: 0; background: var(--accent); }
+    .duration { font-variant-numeric: tabular-nums; }
+    #message { min-height: 24px; margin: 12px 0; }
+    #sample-status { min-height: 24px; }
+    #storage { display: block; margin-top: 16px; }
+    details { margin-top: 24px; }
+    summary { cursor: pointer; }
+    #credits p { overflow-wrap: anywhere; }
+    a { color: var(--accent); }
+    @media(max-width: 800px) { .workspace { grid-template-columns: 1fr; } }
+    @media(max-width: 450px) { main { padding: 16px; } .panel { padding: 16px; } h1 { font-size: 23px; } header .actions { width: 100%; } header .actions button { flex: 1; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">DOTEARS / НАБОР ДЛЯ ПРОВЕРКИ</div><h1>Свуш, уведомление или щелчок?</h1></div>
+    <div class="actions"><button id="export" class="primary" type="button">Сохранить разметку</button><button id="import" type="button">Загрузить разметку</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+  </header>
+  <p class="intro">Послушай звук, выбери категорию и уверенность. Порядок перемешан, исходные названия и ответы модели скрыты. Если звук не подходит, выбирай «Другой звук» или «Не уверен». Начни с комфортной громкости.</p>
+  <p id="message" role="status" aria-live="polite"></p>
+  <div class="workspace">
+    <section class="panel">
+      <div class="row"><h2 id="sample-title">Звук</h2><span id="duration" class="duration muted"></span></div>
+      <audio id="audio" controls preload="metadata"></audio>
+      <button id="listen" class="primary" type="button">▶ Слушать звук</button>
+      <div class="choices" role="group" aria-label="Категория звука">
+        <button id="label-whoosh" type="button" class="choice" aria-pressed="false"><span class="key">1</span><span><strong>Свуш</strong><span class="hint">Шумовой взмах, пролёт, воздушный переход</span></span></button>
+        <button id="label-notification" type="button" class="choice" aria-pressed="false"><span class="key">2</span><span><strong>Уведомление / колокольчик</strong><span class="hint">Звонкий тон или короткая мелодия сигнала</span></span></button>
+        <button id="label-ui-click" type="button" class="choice" aria-pressed="false"><span class="key">3</span><span><strong>UI-щелчок</strong><span class="hint">Короткий клик, тик, нажатие или переключение</span></span></button>
+        <button id="label-other" type="button" class="choice" aria-pressed="false"><span class="key">4</span><span><strong>Другой звук</strong><span class="hint">Не относится к трём категориям; можно описать ниже</span></span></button>
+        <button id="label-uncertain" type="button" class="choice" aria-pressed="false"><span class="key">5</span><span><strong>Не уверен</strong><span class="hint">Не получается определить; это полезная отметка</span></span></button>
+      </div>
+      <label for="confidence">Насколько уверен?<select id="confidence"><option value="">Пока не выбрано</option><option value="high">Уверен</option><option value="medium">Скорее да</option><option value="low">Есть сомнения</option></select></label>
+      <label class="check"><input id="multiple" type="checkbox"><span>Слышу несколько разных звуков</span></label>
+      <label for="note">Заметка — по желанию<textarea id="note" maxlength="2000" placeholder="Например: больше похоже на музыкальную ноту; свуш с ударом в конце"></textarea></label>
+      <p id="sample-status" class="muted" aria-live="polite"></p>
+      <div class="row navigation"><button id="prev" type="button">← Назад</button><button id="next" class="primary" type="button">Дальше →</button></div>
+      <label class="check"><input id="autoplay" type="checkbox" checked><span>Слушать при переходе к следующему звуку</span></label>
+      <small>Пробел — слушать; 1–5 — категория; стрелки ← → — переход. Поля ввода работают как обычно.</small>
+    </section>
+    <div>
+      <section class="panel">
+        <h2>Твой прогресс</h2>
+        <p id="progress-text" aria-live="polite"></p><div class="progress"><div id="progress-bar"></div></div>
+        <div id="numbers" class="numbers" aria-label="Перейти к звуку"></div>
+        <button id="unreviewed" type="button">К следующему неразмеченному</button>
+        <p id="uncertain-count" class="muted"></p>
+        <label for="reviewer">Имя или ник — по желанию<input id="reviewer" type="text" maxlength="100" autocomplete="off" placeholder="Можно оставить пустым"></label>
+        <small id="storage"></small>
+      </section>
+      <section class="panel">
+        <h2>Как отмечать</h2>
+        <p>Выбирай по тому, что слышишь. Уведомление здесь — тональный сигнал, UI-щелчок — короткое нажатие. Назначение звука в конкретном приложении угадывать не нужно.</p>
+        <p>Если есть два эффекта, выбери основной, поставь отметку «несколько звуков» и опиши второй в заметке.</p>
+        <p>Можно остановиться в любой момент. Нажми <strong>«Сохранить разметку»</strong>: файл <strong>dotears-sfx-labels.json</strong> попадёт в загрузки без аудио.</p>
+      </section>
+    </div>
+  </div>
+  <details><summary>Источники и условия набора</summary><p>Все исходники в этом наборе опубликованы под CC0. В начало и конец добавлена короткая тишина; звуки не обрезаны, усиление не применялось. Близкие варианты одного исходника сохраняются одной группой для будущей проверки модели.</p><div id="credits"></div><p>Набор пока не размечен. Названия файлов и карточек авторов не считаются правильными ответами. Страница не обращается к сети; оценки хранятся в этом браузере и в выгруженном JSON.</p></details>
+</main>
+<script id="sfx-data" type="application/json">__SFX_DATA__</script>
+<script>
+(() => {
+  'use strict';
+  const data = JSON.parse(document.getElementById('sfx-data').textContent);
+  const $ = id => document.getElementById(id);
+  const samples = data.samples;
+  const schema = 'dotears.sfx-labels/1';
+  const key = 'dotears-sfx-labels-v1:' + data.dataset_id;
+  const choices = [['whoosh','label-whoosh'],['notification','label-notification'],['ui_click','label-ui-click'],['other','label-other'],['uncertain','label-uncertain']];
+  const allowedLabels = new Set(choices.map(pair=>pair[0]));
+  const confidenceValues = new Set(['high','medium','low']);
+  const empty = () => ({label:null,confidence:null,multiple_sounds:false,note:'',play_count:0});
+  let state = Object.fromEntries(samples.map(s=>[s.id,empty()]));
+  let reviewer = '';
+  let index = 0;
+  let autosaved = true;
+  let storageWarning = '';
+  const buttons = [];
+  const current = () => samples[index];
+  const rating = () => state[current().id];
+  const complete = row => row.label !== null && row.confidence !== null;
+  const message = text => { $('message').textContent=text; };
+  function snapshot() {
+    return {schema_version:schema,dataset_id:data.dataset_id,label_set_version:data.label_set_version,
+      saved_at:new Date().toISOString(),reviewer,completed_count:samples.filter(s=>complete(state[s.id])).length,
+      samples:samples.map(s=>({id:s.id,source_sha256:s.source_sha256,audio_sha256:s.audio_sha256,group_id:s.group_id,...state[s.id]}))};
+  }
+  function validate(value) {
+    if (!value || value.schema_version!==schema || value.dataset_id!==data.dataset_id || value.label_set_version!==data.label_set_version || !Array.isArray(value.samples) || value.samples.length!==samples.length) throw new Error('Файл относится к другому набору или формату.');
+    if (typeof value.reviewer!=='string' || value.reviewer.length>100) throw new Error('Некорректное имя разметчика.');
+    const result={};
+    for (const sample of samples) {
+      const matches=value.samples.filter(row=>row && row.id===sample.id);
+      if (matches.length!==1) throw new Error('Набор звуков не совпадает или содержит повторы.');
+      const row=matches[0];
+      if (row.source_sha256!==sample.source_sha256 || row.audio_sha256!==sample.audio_sha256 || row.group_id!==sample.group_id) throw new Error('Хэш или группа исходника не совпадает.');
+      if ((row.label!==null && !allowedLabels.has(row.label)) || (row.confidence!==null && !confidenceValues.has(row.confidence)) || typeof row.multiple_sounds!=='boolean' || typeof row.note!=='string' || row.note.length>2000 || !Number.isSafeInteger(row.play_count) || row.play_count<0 || row.play_count>100000) throw new Error('Повреждены оценки звука.');
+      if (row.label==='uncertain' && row.confidence!=='low') throw new Error('Для неопределённой категории ожидается низкая уверенность.');
+      result[sample.id]={label:row.label,confidence:row.confidence,multiple_sounds:row.multiple_sounds,note:row.note,play_count:row.play_count};
+    }
+    return {ratings:result,reviewer:value.reviewer};
+  }
+  try {
+    const saved=localStorage.getItem(key);
+    if (saved) { const loaded=validate(JSON.parse(saved)); state=loaded.ratings; reviewer=loaded.reviewer; }
+  } catch (_) { autosaved=false; storageWarning='Не удалось прочитать сохранённые оценки. Можно загрузить выгруженный JSON.'; }
+  function progress() {
+    const count=samples.filter(s=>complete(state[s.id])).length;
+    const unsure=samples.filter(s=>state[s.id].label==='uncertain').length;
+    $('progress-text').textContent=`Размечено ${count} из ${samples.length}`;
+    $('progress-bar').style.width=(count/samples.length*100)+'%';
+    $('uncertain-count').textContent=unsure ? `С категорией «не уверен»: ${unsure}. Такие ответы не станут подтверждёнными названиями.` : 'Для завершения отметь категорию и уверенность.';
+    $('storage').textContent=autosaved ? 'Оценки сохранены в этом браузере. Для передачи сохрани JSON кнопкой сверху.' : 'Автосохранение недоступно. Сохрани JSON перед закрытием страницы.';
+    for (let i=0;i<buttons.length;i++) {
+      const done=complete(state[samples[i].id]);
+      buttons[i].className='number'+(done?' reviewed':'');
+      buttons[i].setAttribute('aria-current',i===index?'true':'false');
+      buttons[i].setAttribute('aria-label',`Звук ${i+1}: ${done?'размечен':'не размечен'}`);
+    }
+    $('unreviewed').disabled=count===samples.length;
+    $('sample-status').textContent=complete(rating()) ? 'Категория и уверенность отмечены.' : rating().label ? 'Осталось выбрать уверенность.' : 'Выбери категорию после прослушивания.';
+  }
+  function save() {
+    try { localStorage.setItem(key,JSON.stringify(snapshot())); autosaved=true; }
+    catch (_) { autosaved=false; }
+    progress();
+  }
+  function play() {
+    $('audio').pause(); $('audio').currentTime=0;
+    $('audio').play().catch(()=>message('Нажми ▶ в плеере для воспроизведения.'));
+  }
+  function render() {
+    $('audio').pause(); $('audio').src=current().audio;
+    $('sample-title').textContent=`Звук ${String(index+1).padStart(2,'0')} из ${samples.length}`;
+    $('duration').textContent=current().duration_seconds.toLocaleString('ru-RU',{maximumFractionDigits:2})+' с';
+    $('confidence').value=rating().confidence || '';
+    $('confidence').disabled=rating().label==='uncertain';
+    $('multiple').checked=rating().multiple_sounds;
+    $('note').value=rating().note;
+    for (const [label,id] of choices) $(id).setAttribute('aria-pressed',rating().label===label?'true':'false');
+    $('prev').disabled=index===0; $('next').disabled=index===samples.length-1;
+    progress();
+  }
+  function move(to,listen=false) {
+    if (to<0 || to>=samples.length) return;
+    index=to; message(''); render();
+    if (listen && $('autoplay').checked) play();
+  }
+  function choose(label) {
+    rating().label=label;
+    if (label==='uncertain') rating().confidence='low';
+    $('confidence').value=rating().confidence || '';
+    $('confidence').disabled=label==='uncertain';
+    for (const [value,id] of choices) $(id).setAttribute('aria-pressed',label===value?'true':'false');
+    save();
+  }
+  for (const [label,id] of choices) $(id).onclick=()=>choose(label);
+  $('confidence').onchange=()=>{ rating().confidence=$('confidence').value || null; save(); };
+  $('multiple').onchange=()=>{ rating().multiple_sounds=$('multiple').checked; save(); };
+  $('note').addEventListener('input',()=>{ rating().note=$('note').value; save(); });
+  $('reviewer').value=reviewer;
+  $('reviewer').addEventListener('input',()=>{ reviewer=$('reviewer').value; save(); });
+  $('listen').onclick=play;
+  $('audio').volume=.65;
+  $('audio').addEventListener('play',()=>{ rating().play_count=Math.min(100000,rating().play_count+1); save(); });
+  $('audio').addEventListener('error',()=>message('Не удалось воспроизвести звук. Открой HTML-файл в обычном браузере.'));
+  $('prev').onclick=()=>move(index-1,true);
+  $('next').onclick=()=>move(index+1,true);
+  $('unreviewed').onclick=()=>{
+    for (let offset=1;offset<=samples.length;offset++) {
+      const to=(index+offset)%samples.length;
+      if (!complete(state[samples[to].id])) { move(to,true); return; }
+    }
+  };
+  samples.forEach((sample,i)=>{
+    const button=document.createElement('button'); button.type='button'; button.textContent=String(i+1).padStart(2,'0');
+    button.onclick=()=>move(i,true); buttons.push(button); $('numbers').append(button);
+  });
+  $('export').onclick=()=>{
+    const exported=snapshot();
+    const blob=new Blob([JSON.stringify(exported,null,2)],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob), link=document.createElement('a');
+    link.href=url; link.download=data.export_filename || 'dotears-sfx-labels.json'; document.body.append(link); link.click(); link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    message(`Выгружена разметка: ${exported.completed_count} из ${samples.length}. Неоценённые звуки сохранены пустыми.`);
+  };
+  $('import').onclick=()=>$('import-file').click();
+  $('import-file').onchange=async()=>{
+    const file=$('import-file').files[0]; if (!file) return;
+    try {
+      if (file.size>2000000) throw new Error('Файл разметки слишком большой.');
+      const loaded=validate(JSON.parse(await file.text()));
+      $('audio').pause(); state=loaded.ratings; reviewer=loaded.reviewer; $('reviewer').value=reviewer;
+      save(); render(); message('Разметка загружена.');
+    } catch (error) { message('Не удалось загрузить: '+error.message); }
+    $('import-file').value='';
+  };
+  for (const [i,credit] of data.credits.entries()) {
+    const paragraph=document.createElement('p');
+    const link=document.createElement('a'); link.textContent=`Источник ${i+1}: ${credit.author} · ${credit.license}`;
+    link.href=credit.page; link.target='_blank'; link.rel='noopener noreferrer'; paragraph.append(link); $('credits').append(paragraph);
+  }
+  document.addEventListener('keydown',event=>{
+    if (event.altKey || event.ctrlKey || event.metaKey || ['INPUT','TEXTAREA','SELECT','AUDIO','A','SUMMARY'].includes(event.target.tagName)) return;
+    if (event.key===' ' && event.target.tagName!=='BUTTON') { event.preventDefault(); play(); }
+    else if (/^[1-5]$/.test(event.key)) { event.preventDefault(); choose(choices[Number(event.key)-1][0]); }
+    else if (event.key==='ArrowRight') { event.preventDefault(); move(index+1,true); }
+    else if (event.key==='ArrowLeft') { event.preventDefault(); move(index-1,true); }
+  });
+  const firstIncomplete=samples.findIndex(sample=>!complete(state[sample.id]));
+  if (firstIncomplete>=0) index=firstIncomplete;
+  render();
+  if (storageWarning) message(storageWarning);
+})();
+</script>
+</body>
+</html>
